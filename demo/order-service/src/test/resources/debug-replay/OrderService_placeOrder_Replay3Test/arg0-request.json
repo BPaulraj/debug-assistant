@@ -1,0 +1,17 @@
+{
+  "@type": "com.demo.order.CreateOrderRequest",
+  "customerId": "C-2",
+  "cardNumber": "****",
+  "lines": [
+    {
+      "@type": "com.demo.order.OrderLine",
+      "sku": "BOOK-1",
+      "quantity": 10
+    },
+    {
+      "@type": "com.demo.order.OrderLine",
+      "sku": "PEN-7",
+      "quantity": 2
+    }
+  ]
+}

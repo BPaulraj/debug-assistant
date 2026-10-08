@@ -1,0 +1,12 @@
+{
+  "@type": "com.demo.order.Order",
+  "id": "ORD-1002",
+  "customerId": "C-2",
+  "status": "CONFIRMED",
+  "total": 14.90,
+  "createdAt": "2026-10-08T16:11:53.778356800",
+  "notes": [
+    "10 x BOOK-1 = 12.50",
+    "2 x PEN-7 = 2.40"
+  ]
+}

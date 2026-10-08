@@ -1,0 +1,19 @@
+# build output
+target/
+build/
+*.class
+
+# recordings and reports contain machine names, local paths and request data
+debug-recordings/
+demo/rec-*/
+*.tmp
+debug-report.html
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath

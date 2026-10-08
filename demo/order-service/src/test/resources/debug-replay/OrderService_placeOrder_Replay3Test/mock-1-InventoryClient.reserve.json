@@ -1,0 +1,26 @@
+[
+  {
+    "returns": {
+      "@type": "com.demo.order.Reservation",
+      "sku": "BOOK-1",
+      "reserved": 10,
+      "unitPrice": 12.50
+    },
+    "recordedArgs": [
+      "BOOK-1",
+      10
+    ]
+  },
+  {
+    "returns": {
+      "@type": "com.demo.order.Reservation",
+      "sku": "PEN-7",
+      "reserved": 2,
+      "unitPrice": 1.20
+    },
+    "recordedArgs": [
+      "PEN-7",
+      2
+    ]
+  }
+]

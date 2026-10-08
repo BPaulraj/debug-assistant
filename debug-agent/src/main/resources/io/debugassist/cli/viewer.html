@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Debug Flow Report</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --line: #e3e6eb; --text: #1d2330; --muted: #6b7385;
+  --accent: #2f6fde; --accent-soft: #e8f0fd; --err: #c8332b; --err-soft: #fdeceb;
+  --ok: #1f8a4c; --warn: #b26a00; --code: #f3f5f8; --sel: #dfe9fb;
+  --k-key: #7a3fb8; --k-str: #1f7a4a; --k-num: #b35c00; --k-lit: #2f6fde;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #1a1e26; --line: #2a303b; --text: #e3e7ee; --muted: #8d96a8;
+    --accent: #6ea0ff; --accent-soft: #1f2b44; --err: #ff7a70; --err-soft: #3a1f1f;
+    --ok: #5fd08f; --warn: #f0b45a; --code: #141820; --sel: #23324f;
+    --k-key: #c79bff; --k-str: #7fd7a3; --k-num: #ffb86b; --k-lit: #8ab4ff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --panel: #1a1e26; --line: #2a303b; --text: #e3e7ee; --muted: #8d96a8;
+  --accent: #6ea0ff; --accent-soft: #1f2b44; --err: #ff7a70; --err-soft: #3a1f1f;
+  --ok: #5fd08f; --warn: #f0b45a; --code: #141820; --sel: #23324f;
+  --k-key: #c79bff; --k-str: #7fd7a3; --k-num: #ffb86b; --k-lit: #8ab4ff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; font-size: 12.5px; }
+header { display: flex; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+header .stats { color: var(--muted); font-size: 13px; }
+header .spacer { flex: 1; }
+input[type=search] { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 240px; font: inherit; }
+label.chk { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+.layout { display: grid; grid-template-columns: 320px minmax(0, 1fr) minmax(0, 0.9fr); height: calc(100% - 53px); }
+.col { overflow: auto; border-right: 1px solid var(--line); min-width: 0; }
+.col:last-child { border-right: 0; }
+.col h2 { position: sticky; top: 0; z-index: 1; margin: 0; padding: 8px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--bg); border-bottom: 1px solid var(--line); }
+.trace { padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.trace:hover { background: var(--accent-soft); }
+.trace.sel { background: var(--sel); }
+.trace .sum { font-weight: 550; word-break: break-all; }
+.trace .meta { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.chip { display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 11.5px; font-weight: 600; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.chip.err { background: var(--err-soft); color: var(--err); }
+.row { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 0; cursor: pointer; white-space: nowrap; border-left: 3px solid transparent; }
+.row:hover { background: var(--accent-soft); }
+.row.sel { background: var(--sel); border-left-color: var(--accent); }
+.row.hit .label { background: color-mix(in srgb, var(--warn) 25%, transparent); border-radius: 3px; }
+.row .tog { width: 16px; text-align: center; color: var(--muted); flex: none; user-select: none; }
+.row .label { overflow: hidden; text-overflow: ellipsis; }
+.row .cls { color: var(--muted); }
+.row .dur { margin-left: auto; color: var(--muted); font-size: 12px; padding-left: 10px; }
+.row .bar { width: 70px; height: 6px; background: var(--line); border-radius: 3px; flex: none; position: relative; }
+.row .bar i { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; opacity: .7; }
+.kind { font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 4px; flex: none; }
+.kind.in { background: var(--ok); color: var(--panel); }
+.kind.out { background: var(--warn); color: var(--panel); }
+.kind.exc { background: var(--err); color: var(--panel); }
+.status-ok { color: var(--ok); font-weight: 600; }
+.status-bad { color: var(--err); font-weight: 600; }
+.appline { padding: 8px 12px 4px; font-size: 12px; color: var(--muted); }
+.details { padding: 14px 16px 40px; }
+.details h3 { margin: 0 0 2px; font-size: 15px; word-break: break-all; }
+.details .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 12px; word-break: break-all; }
+.details h4 { margin: 18px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.param { margin-bottom: 10px; }
+.param .pn { font-weight: 600; }
+.param .pt { color: var(--muted); font-size: 12px; word-break: break-all; }
+pre.json { background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 4px 0 0; overflow: auto; max-height: 420px; white-space: pre-wrap; word-break: break-word; }
+.jk { color: var(--k-key); } .js { color: var(--k-str); } .jn { color: var(--k-num); } .jl { color: var(--k-lit); } .jt { color: var(--muted); font-style: italic; }
+.excbox { background: var(--err-soft); border: 1px solid color-mix(in srgb, var(--err) 40%, transparent); border-radius: 6px; padding: 8px 10px; }
+.excbox b { color: var(--err); }
+.excbox pre { margin: 6px 0 0; white-space: pre-wrap; font-size: 11.5px; color: var(--muted); }
+.changed { border-color: var(--warn); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.cmd { background: var(--code); border: 1px dashed var(--line); border-radius: 6px; padding: 6px 8px; margin-top: 6px; word-break: break-all; }
+.empty { color: var(--muted); padding: 24px 16px; }
+.hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 260px minmax(0, 1fr); }
+  .layout .col.det { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+  .layout { height: auto; }
+  .col { max-height: 70vh; }
+}
+@media (max-width: 700px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  header { padding: 10px 16px; }
+  input[type=search] { min-width: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Debug Flow Report</h1>
+  <span class="stats" id="stats"></span>
+  <span class="spacer"></span>
+  <input type="search" id="q" placeholder="Search trace id, URL, class, method or data…">
+  <label class="chk"><input type="checkbox" id="errorsOnly"> Errors only</label>
+  <button id="theme" title="Toggle light/dark">◐</button>
+</header>
+<div class="layout">
+  <section class="col"><h2>Traces</h2><div id="traces"></div></section>
+  <section class="col"><h2>Call flow</h2><div id="tree"><div class="empty">Select a trace.</div></div></section>
+  <section class="col det"><h2>Details</h2><div id="details" class="details"><div class="empty">Select a call to see its data.</div></div></section>
+</div>
+<script>
+const RECORDINGS = /*__RECORDINGS__*/[];
+const AGENT_JAR = __AGENT_JAR__;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const short = (cls) => cls ? cls.substring(cls.lastIndexOf('.') + 1) : '';
+const shortType = (t) => String(t).replace(/([\w$]+\.)+/g, '');
+const fmtDur = (us) => us < 0 ? '?' : us < 1000 ? us + ' µs' : us < 1e6 ? (us / 1000).toFixed(1) + ' ms' : (us / 1e6).toFixed(2) + ' s';
+const fmtTime = (ms) => { const d = new Date(ms); return d.toLocaleDateString() + ' ' + d.toLocaleTimeString() + '.' + String(d.getMilliseconds()).padStart(3, '0'); };
+
+// ---------------------------------------------------------------- build traces (merged across apps)
+const traces = (() => {
+  const by = new Map();
+  for (const r of RECORDINGS) {
+    const rec = r.rec; rec.file = r.file;
+    if (!by.has(rec.traceId)) by.set(rec.traceId, []);
+    by.get(rec.traceId).push(rec);
+  }
+  const out = [];
+  for (const [id, recs] of by) {
+    recs.sort((a, b) => a.start - b.start);
+    const text = JSON.stringify(recs).toLowerCase(); // before parent links make the tree circular
+    let seq = 0;
+    const index = (n, rec, parent) => { n._rec = rec; n._key = ++seq; n._parent = parent; (n.children || []).forEach(c => index(c, rec, n)); };
+    recs.forEach(rec => index(rec.root, rec, null));
+    // Attach each downstream app's recording under the outgoing HTTP call that caused it.
+    const claimed = new Set();
+    const pathOf = (u) => { try { const x = new URL(u, 'http://h'); return x.pathname + x.search; } catch (e) { return u; } };
+    const walk = (n, fn) => { fn(n); (n.children || []).forEach(c => walk(c, fn)); };
+    for (const rec of recs) {
+      walk(rec.root, n => {
+        if (n.kind !== 'http-out' || n._remote) return;
+        const want = pathOf(n.http.url);
+        const match = recs.find(o => o !== rec && !claimed.has(o) && o.root.kind === 'http-in'
+          && pathOf(o.root.http.url) === want && o.start >= n.start - 5000);
+        if (match) { claimed.add(match); n._remote = match; match.root._parent = n; }
+      });
+    }
+    const roots = recs.filter(r => !claimed.has(r));
+    const apps = [...new Set(recs.map(r => r.app))];
+    const error = recs.some(r => r.error);
+    const exc = recs.some(r => { let f = false; walk(r.root, n => { if (n.exc) f = true; }); return f; });
+    out.push({ id, recs, roots, apps, error, exc, start: recs[0].start, summary: roots[0].summary, durUs: roots[0].durUs,
+      text });
+  }
+  return out.sort((a, b) => b.start - a.start);
+})();
+
+let current = null, selected = null;
+const collapsed = new Set();
+
+$('stats').textContent = traces.length + ' trace(s) · ' + RECORDINGS.length + ' recording(s) · ' +
+  new Set(RECORDINGS.map(r => r.rec.app)).size + ' app(s)';
+
+function renderTraces() {
+  const q = $('q').value.trim().toLowerCase();
+  const errorsOnly = $('errorsOnly').checked;
+  const list = traces.filter(t => (!errorsOnly || t.error || t.exc) && (!q || t.id.includes(q) || t.text.includes(q)));
+  $('traces').innerHTML = list.length ? list.map(t => `
+    <div class="trace ${current === t ? 'sel' : ''}" data-id="${esc(t.id)}">
+      <div class="sum">${esc(t.summary)}</div>
+      <div class="meta"><span>${esc(fmtTime(t.start))}</span><span>${fmtDur(t.durUs)}</span>
+        ${t.error ? '<span class="chip err">error</span>' : t.exc ? '<span class="chip err">exception</span>' : ''}</div>
+      <div class="meta">${t.apps.map(a => `<span class="chip">${esc(a)}</span>`).join('')}</div>
+      <div class="meta mono">${esc(t.id)}</div>
+    </div>`).join('') : '<div class="empty">No traces match.</div>';
+  for (const el of document.querySelectorAll('.trace')) {
+    el.onclick = () => selectTrace(traces.find(t => t.id === el.dataset.id));
+  }
+}
+
+function selectTrace(t) {
+  current = t; selected = null;
+  renderTraces(); renderTree();
+  // Open on the deepest exception origin (the real root cause, possibly in a downstream app), else the first method.
+  let first = null, origin = null;
+  const walk = (n) => { if (!first && n.kind === 'method') first = n; if (n.exc && n.exc.origin) origin = n;
+    (n.children || []).forEach(walk); if (n._remote) walk(n._remote.root); };
+  t.roots.forEach(r => walk(r.root));
+  select(origin || first || t.roots[0].root);
+}
+
+function label(n) {
+  if (n.kind === 'method') {
+    const params = (n.params || []).map(p => shortType(p.t)).join(', ');
+    return `<span class="cls">${esc(short(n.cls))}.</span><b>${esc(n.m)}</b>(${esc(params)})`;
+  }
+  const st = n.http.status;
+  const stc = st >= 400 || st === 0 ? 'status-bad' : 'status-ok';
+  return `${esc(n.http.method)} ${esc(n.http.url)} <span class="${stc}">${st || ''}</span>`;
+}
+
+function renderTree() {
+  if (!current) return;
+  const q = $('q').value.trim().toLowerCase();
+  const rootDur = Math.max(1, ...current.roots.map(r => r.root.durUs));
+  const rootStart = current.start;
+  const html = [];
+  const row = (n, depth, appChanged) => {
+    if (appChanged) html.push(`<div class="appline" style="padding-left:${12 + depth * 16}px"><span class="chip">${esc(n._rec.app)}</span> ${esc(n._rec.host)} · ${esc(n._rec.thread)}</div>`);
+    const kids = (n.children || []).length + (n._remote ? 1 : 0);
+    const isCol = collapsed.has(n);
+    const off = Math.max(0, (n.start - rootStart) * 1000) / rootDur * 100;
+    const w = Math.max(2, n.durUs / rootDur * 100);
+    const hit = q && !current.id.includes(q) && JSON.stringify([n.cls, n.m, n.args, n.result, n.http, n.exc]).toLowerCase().includes(q);
+    const kind = n.kind === 'http-in' ? '<span class="kind in">IN</span>' : n.kind === 'http-out' ? '<span class="kind out">OUT</span>' : '';
+    const exc = n.exc ? `<span class="kind exc" title="${esc(n.exc.type)}">${n.exc.origin ? 'THROWS' : 'EXC'}</span>` : '';
+    html.push(`<div class="row ${selected === n ? 'sel' : ''} ${hit ? 'hit' : ''}" data-key="${n._rec.traceId}:${n._key}:${esc(n._rec.file)}" style="padding-left:${8 + depth * 16}px">
+      <span class="tog">${kids ? (isCol ? '▸' : '▾') : '·'}</span>${kind}<span class="label">${label(n)}</span>${exc}
+      <span class="dur">${fmtDur(n.durUs)}</span><span class="bar"><i style="left:${Math.min(off, 98)}%;width:${Math.min(w, 100 - Math.min(off, 98))}%"></i></span></div>`);
+    rowNodes.push(n);
+    if (isCol) return;
+    (n.children || []).forEach(c => row(c, depth + 1, false));
+    if (n._remote) row(n._remote.root, depth + 1, true);
+  };
+  rowNodes = [];
+  current.roots.forEach(r => row(r.root, 0, true));
+  $('tree').innerHTML = html.join('');
+  document.querySelectorAll('#tree .row').forEach((el, i) => {
+    const n = rowNodes[i];
+    el.onclick = (e) => {
+      if (e.target.classList.contains('tog')) { collapsed.has(n) ? collapsed.delete(n) : collapsed.add(n); renderTree(); return; }
+      select(n);
+    };
+  });
+}
+let rowNodes = [];
+
+function json(v) {
+  const s = JSON.stringify(v, null, 2);
+  if (s === undefined) return '<span class="jt">(none)</span>';
+  return esc(s).replace(/(&quot;(?:\\.|[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (m, str, colon, lit, num) => {
+      if (str) {
+        if (colon) return `<span class="jk">${str}</span>${colon}`;
+        return /^&quot;(&lt;.*&gt;|\*\*\*\*)&quot;$/.test(str) ? `<span class="jt">${str}</span>` : `<span class="js">${str}</span>`;
+      }
+      if (lit) return `<span class="jl">${lit}</span>`;
+      return `<span class="jn">${num}</span>`;
+    });
+}
+
+function select(n) {
+  selected = n;
+  renderTree();
+  const rec = n._rec;
+  const d = [];
+  if (n.kind === 'method') {
+    d.push(`<h3>${esc(short(n.cls))}.${esc(n.m)}()</h3>`);
+    d.push(`<div class="sub mono">${esc(n.cls)}${n.static ? ' · static' : ''} · ${esc(n.vis)}${n.proxy ? ' · proxy' : ''}</div>`);
+  } else {
+    d.push(`<h3>${n.kind === 'http-in' ? 'Incoming' : 'Outgoing'} ${esc(n.http.method)} ${esc(n.http.url)}</h3>`);
+    d.push(`<div class="sub">HTTP status ${n.http.status || 'unknown'}${n._remote ? ' · handled by ' + esc(n._remote.app) + ' (shown below it in the flow)' : ''}</div>`);
+  }
+  d.push(`<div class="sub"><span class="chip">${esc(rec.app)}</span> ${esc(rec.host)} · pid ${esc(rec.pid)} · ${esc(rec.thread)}<br>
+    ${esc(fmtTime(n.start))} · ${fmtDur(n.durUs)} · call #${n.id}</div>`);
+
+  if (n.exc) {
+    d.push(`<h4>${n.exc.origin ? 'Thrown here' : 'Exception passed through'}</h4><div class="excbox"><b>${esc(n.exc.type)}</b>: ${esc(n.exc.msg ?? '')}
+      ${n.exc.stack ? `<pre>${esc(n.exc.stack.join('\n'))}</pre>` : ''}</div>`);
+  }
+  if (n.kind === 'method') {
+    if ((n.params || []).length) {
+      d.push('<h4>Arguments (on entry)</h4>');
+      n.params.forEach((p, i) => d.push(`<div class="param"><span class="pn">${esc(p.n)}</span> <span class="pt mono">${esc(p.t)}</span><pre class="json">${json(n.args[i])}</pre></div>`));
+    }
+    if (n.argsAfter) {
+      const changed = n.params.map((p, i) => JSON.stringify(n.args[i]) !== JSON.stringify(n.argsAfter[i]) ? i : -1).filter(i => i >= 0);
+      if (changed.length) {
+        d.push('<h4>Arguments changed by this method (on exit)</h4>');
+        changed.forEach(i => d.push(`<div class="param"><span class="pn">${esc(n.params[i].n)}</span><pre class="json changed">${json(n.argsAfter[i])}</pre></div>`));
+      }
+    }
+    if (!n.exc) {
+      d.push(`<h4>Returned</h4>`);
+      d.push(n.retRaw === 'void' ? '<div class="hint">void</div>' : `<div class="pt mono">${esc(n.ret)}</div><pre class="json">${json(n.result)}</pre>`);
+    }
+    if (!n.proxy) {
+      const cmd = `java -jar "${AGENT_JAR}" replay "${rec.file}" ${n.id} --project <path-to-${rec.app}-module>`;
+      d.push(`<h4>Reproduce locally</h4><div class="hint">Generates a JUnit test that calls this method with these exact arguments, with its collaborators mocked to answer what they answered in QA.</div>
+        <div class="cmd mono" id="cmd">${esc(cmd)}</div>
+        <div class="actions"><button id="copyCmd">Copy replay command</button><button id="copyJson">Copy call JSON</button></div>`);
+    }
+  }
+  d.push(`<h4>Recording file</h4><div class="mono hint">${esc(rec.file)}</div>`);
+  $('details').innerHTML = d.join('');
+  const copy = (text, btn) => navigator.clipboard.writeText(text).then(() => { const t = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = t, 1200); });
+  if ($('copyCmd')) $('copyCmd').onclick = (e) => copy($('cmd').textContent, e.target);
+  if ($('copyJson')) $('copyJson').onclick = (e) => copy(JSON.stringify({ cls: n.cls, m: n.m, params: n.params, args: n.args, result: n.result, exc: n.exc }, null, 2), e.target);
+}
+
+$('q').oninput = () => { renderTraces(); renderTree(); };
+$('errorsOnly').onchange = renderTraces;
+$('theme').onclick = () => {
+  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+};
+// Deep link: report.html#<traceId>
+renderTraces();
+const wanted = traces.find(t => t.id === location.hash.slice(1)) || traces[0];
+if (wanted) selectTrace(wanted);
+</script>
+</body>
+</html>

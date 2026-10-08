@@ -1,0 +1,13 @@
+[
+  {
+    "returns": {
+      "@type": "com.demo.inventory.StockItem",
+      "sku": "LAMP-3",
+      "unitPrice": 49.99,
+      "available": 2
+    },
+    "recordedArgs": [
+      "LAMP-3"
+    ]
+  }
+]
